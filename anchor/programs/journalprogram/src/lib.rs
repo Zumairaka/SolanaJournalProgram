@@ -2,69 +2,98 @@
 
 use anchor_lang::prelude::*;
 
-declare_id!("coUnmi3oBUtwtd9fjeAvSsJssXh5A5xyPbhpewyzRVF");
+declare_id!("5oa7L4NnRQ4D1XG59F65dV1ENkqknSoxstdi8Mu9Lhho");
 
 #[program]
 pub mod journalprogram {
     use super::*;
 
-  pub fn close(_ctx: Context<CloseJournalprogram>) -> Result<()> {
-    Ok(())
-  }
+    pub fn add_journal(context: Context<AddJournal>, title: String, message: String) -> Result<()> {
+        let journal = &mut context.accounts.journal;
+        journal.owner = *context.accounts.signer.key;
+        journal.title = title;
+        journal.message = message;
 
-  pub fn decrement(ctx: Context<Update>) -> Result<()> {
-    ctx.accounts.journalprogram.count = ctx.accounts.journalprogram.count.checked_sub(1).unwrap();
-    Ok(())
-  }
+        Ok(())
+    }
 
-  pub fn increment(ctx: Context<Update>) -> Result<()> {
-    ctx.accounts.journalprogram.count = ctx.accounts.journalprogram.count.checked_add(1).unwrap();
-    Ok(())
-  }
+    pub fn update_journal(
+        context: Context<UpdateJournal>,
+        _title: String,
+        message: String,
+    ) -> Result<()> {
+        let journal = &mut context.accounts.journal;
+        journal.message = message;
+        Ok(())
+    }
 
-  pub fn initialize(_ctx: Context<InitializeJournalprogram>) -> Result<()> {
-    Ok(())
-  }
-
-  pub fn set(ctx: Context<Update>, value: u8) -> Result<()> {
-    ctx.accounts.journalprogram.count = value.clone();
-    Ok(())
-  }
-}
-
-#[derive(Accounts)]
-pub struct InitializeJournalprogram<'info> {
-  #[account(mut)]
-  pub payer: Signer<'info>,
-
-  #[account(
-  init,
-  space = 8 + Journalprogram::INIT_SPACE,
-  payer = payer
-  )]
-  pub journalprogram: Account<'info, Journalprogram>,
-  pub system_program: Program<'info, System>,
-}
-#[derive(Accounts)]
-pub struct CloseJournalprogram<'info> {
-  #[account(mut)]
-  pub payer: Signer<'info>,
-
-  #[account(
-  mut,
-  close = payer, // close account and return lamports to payer
-  )]
-  pub journalprogram: Account<'info, Journalprogram>,
-}
-
-#[derive(Accounts)]
-pub struct Update<'info> {
-  #[account(mut)]
-  pub journalprogram: Account<'info, Journalprogram>,
+    pub fn delete_journal(_context: Context<DeleteJournal>, _title: String) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[account]
 #[derive(InitSpace)]
-pub struct Journalprogram {
-  count: u8,
+pub struct Journal {
+    pub owner: Pubkey,
+
+    #[max_len(100)]
+    pub title: String,
+
+    #[max_len(250)]
+    pub message: String,
+}
+
+#[derive(Accounts)]
+#[instruction(title:String)]
+pub struct AddJournal<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+      init,
+      payer = signer,
+      space = 8 + Journal::INIT_SPACE,
+      seeds = [signer.key().as_ref(), title.as_bytes()],
+      bump
+    )]
+    pub journal: Account<'info, Journal>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(title:String)]
+pub struct UpdateJournal<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+      mut,
+      seeds=[signer.key().as_ref(), title.as_bytes()],
+      bump,
+      realloc = 8 + Journal::INIT_SPACE,
+      realloc::payer = signer,
+      realloc::zero = true
+    )]
+    pub journal: Account<'info, Journal>,
+
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+#[instruction(title:String)]
+pub struct DeleteJournal<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+
+    #[account(
+      mut,
+      seeds=[signer.key().as_ref(), title.as_bytes()],
+      bump,
+      close = signer
+    )]
+    pub journal: Account<'info, Journal>,
+
+    pub system_program: Program<'info, System>,
 }
